@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ask the Bot</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+        .container {
+            width: 500px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"], textarea, button, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #response-container {
+            margin-top: 20px;
+            border: 1px solid #eee;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            white-space: pre-wrap; /* Preserve formatting */
+        }
+        #upload-form {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+        }
+        #upload-form input[type="file"] {
+            margin-bottom: 10px;
+        }
+        #available-tables {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+        }
+        #available-tables h2 {
+            margin-top: 0;
+        }
+        #table-select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ask the Bot</h1>
+
+        <div id="upload-form">
+            <h2>Upload Data</h2>
+            <form method="POST" action="/upload" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="file">Choose a CSV or XLSX file:</label>
+                    <input type="file" name="file" id="file" required>
+                </div>
+                <div class="form-group">
+                    <label for="tablename">Table Name (optional):</label>
+                    <input type="text" name="tablename" id="tablename" placeholder="Enter a table name">
+                </div>
+                <button type="submit">Upload</button>
+            </form>
+            <div id="upload-status"></div>
+        </div>
+
+        <div id="available-tables">
+            <h2>Available Tables</h2>
+            <label for="table-select">Select a table:</label>
+            <select id="table-select">
+                <option value="data" selected>data (default)</option>
+                {% if database_tables %}
+                    {% for table in database_tables %}
+                        <option value="{{ table }}">{{ table }} (DB)</option>
+                    {% endfor %}
+                {% endif %}
+                {% if uploaded_tables %}
+                    {% for table in uploaded_tables %}
+                        <option value="{{ table }}">{{ table }} (Uploaded)</option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="question">Your Question:</label>
+            <textarea id="question" rows="3" placeholder="Ask a question about the data"></textarea>
+        </div>
+        <button onclick="askQuestion()">Ask</button>
+
+        <div id="response-container"></div>
+    </div>
+
+    <script>
+        async function askQuestion() {
+            const tableSelect = document.getElementById("table-select");
+            const table = tableSelect.value;
+            const question = document.getElementById("question").value;
+            const responseContainer = document.getElementById("response-container");
+            responseContainer.innerText = "Loading...";
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ table: table, message: question })
+                });
+                const data = await response.json();
+                responseContainer.innerText = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseContainer.innerText = `Error: ${error.message}`;
+            }
+        }
+
+        document.getElementById('upload-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const uploadStatus = document.getElementById('upload-status');
+            uploadStatus.innerText = 'Uploading...';
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const text = await response.text();
+                uploadStatus.innerText = text;
+                if (response.ok) {
+                    // Reload the page to update the table list (simpler approach)
+                    window.location.reload();
+                }
+            } catch (error) {
+                uploadStatus.innerText = `Upload failed: ${error.message}`;
+            }
+        });
+
+        // Optionally, fetch and update the table list dynamically without full reload
+        // async function updateTableList() {
+        //     const tableSelect = document.getElementById("table-select");
+        //     const response = await fetch('/tables');
+        //     const data = await response.json();
+        //     tableSelect.innerHTML = '<option value="data" selected>data (default)</option>';
+        //     if (data.database_tables) {
+        //         data.database_tables.forEach(table => {
+        //             const option = document.createElement('option');
+        //             option.value = table;
+        //             option.innerText = `${table} (DB)`;
+        //             tableSelect.appendChild(option);
+        //         });
+        //     }
+        //     if (data.uploaded_tables) {
+        //         data.uploaded_tables.forEach(table => {
+        //             const option = document.createElement('option');
+        //             option.value = table;
+        //             option.innerText = `${table} (Uploaded)`;
+        //             tableSelect.appendChild(option);
+        //         });
+        //     }
+        // }
+        // updateTableList(); // Call on page load
+    </script>
+</body>
+</html>
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Upload CSV & Chat Bot</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+    <div id="popup" class="popup hidden"></div>
+    <div class="container">
+        <h1>Upload CSV to MySQL</h1>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="file">Select CSV or Excel file:</label>
+                <input type="file" id="file" name="file" accept=".csv, .xlsx" required />
+            </div>
+            <div class="form-group">
+                <label for="tablename">Table Name (optional):</label>
+                <input type="text" id="tablename" name="tablename" placeholder="Leave empty to use file name" />
+            </div>
+            <button type="submit" class="btn-primary">Upload</button>
+        </form>
+
+        
+        <hr />
+
+        <h2>Ask the Bot</h2>
+        <div class="chat-container">
+            <div class="form-group">
+                <label for="table">Table Name (optional):</label>
+                <input type="text" id="table" placeholder="Enter table name or leave blank for 'data'" />
+            </div>
+            <div class="form-group">
+                <label for="question">Your Question:</label>
+                <input type="text" id="question" placeholder="e.g., What is the count of department?" />
+            </div>
+            <button onclick="askBot()" class="btn-primary">Ask</button>
+            <pre id="response" class="response-box"></pre>
+        </div>
+    </div>
+
+    <script src="/static/chat.js"></script>
+    <script src="/static/popup.js"></script>
+</body>
+</html> -->
